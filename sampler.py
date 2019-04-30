@@ -1,0 +1,110 @@
+import json
+import os
+import pickle
+import random
+
+import numpy as np
+
+
+def read_data(data_path):
+    with open(os.path.join(data_path, "data.pickle"), "rb") as f:
+        data = pickle.load(f)
+    with open(os.path.join(data_path, "dic.pickle"), "rb") as f:
+        dic = pickle.load(f)
+    with open(os.path.join(data_path, "params.json"), "r") as f:
+        params = json.load(f)
+    return data, dic, params
+
+
+def gen_batch_inputs(data,
+                     params,
+                     max_len=512,
+                     mask_rate=0.15,
+                     mask_mask_rate=0.8,
+                     mask_random_rate=0.1,
+                     random_sample_length=True,
+                     minimum_len=3):
+    pad_value = params['value_pad']
+    unk_value = params['value_unk']
+    mask_value = params['value_mask']
+    size_deal = params['size_deal']
+
+    token_inputs, category_inputs, flag_inputs, interval_inputs, masked_inputs = [], [], [], [], []
+    outputs = []
+    for idx, elem in enumerate(data):
+        orig_len = len(elem['deal'])
+        cur_len = orig_len - 1
+        if random_sample_length and cur_len > minimum_len:
+            cur_len = random.randrange(random_sample_length, cur_len + 1)
+        rem_len = max_len - min(max_len, cur_len)
+
+        bidx = random.randrange(0, orig_len - (cur_len + 1) + 1)
+        eidx = bidx + cur_len
+
+        category_inputs.append([pad_value] * rem_len + elem['category'][bidx:eidx] + [pad_value])
+        flag_inputs.append([pad_value] * rem_len + elem['flag'][bidx:eidx] + [pad_value])
+        interval_inputs.append([pad_value] * rem_len + elem['interval'][bidx:eidx] + [pad_value])
+
+        token_input = []
+        masked_input = []
+        output = []
+        for token in elem['deal'][bidx:eidx]:
+            output.append(token)
+            if np.random.random() < mask_rate:
+                masked_input.append(1)
+                r = np.random.random()
+                if r < mask_mask_rate:
+                    token_input.append(mask_value)
+                elif r < mask_mask_rate + mask_random_rate:
+                    while True:
+                        random_token = random.randrange(0, size_deal)
+                        if random_token is pad_value or random_token is unk_value or random_token is mask_value:
+                            pass
+                        else:
+                            break
+                    token_input.append(random_token)
+                else:
+                    token_input.append(token)
+            else:
+                masked_input.append(0)
+                token_input.append(token)
+
+        token_inputs.append([pad_value] * rem_len + token_input + [mask_value])
+        # masked_input에서 0은 non-mask 1은 mask
+        masked_inputs.append([0] * rem_len + masked_input + [1])
+        next_value = elem['deal'][eidx]
+        outputs.append([pad_value] * rem_len + output + [next_value])
+
+    inputs = [np.asarray(x) for x in [token_inputs, category_inputs, flag_inputs, interval_inputs, masked_inputs]]
+    outputs = [np.asarray(np.expand_dims(x, axis=-1)) for x in [outputs]]
+    return inputs, outputs
+
+
+def batch_iter(raw_data, params, batch_size, max_len, data_type='train', shuffle=True):
+    num_batches_per_epoch = int((len(raw_data) - 1) / batch_size) + 1
+
+    def data_generator():
+        data = np.array(raw_data)
+        data_size = len(data)
+        while True:
+            if shuffle:
+                shuffle_indices = np.random.permutation(np.arange(data_size))
+                shuffled_data = data[shuffle_indices]
+            else:
+                shuffled_data = data
+
+            for batch_num in range(num_batches_per_epoch):
+                start_index = batch_num * batch_size
+                end_index = min((batch_num + 1) * batch_size, data_size)
+                if data_type == 'train':
+                    target_data = shuffled_data[start_index: end_index][:-2]
+                elif data_type == 'valid':
+                    target_data = shuffled_data[start_index: end_index][:-1]
+                else:
+                    target_data = shuffled_data[start_index: end_index]
+
+                # 마지막 index를 무조건 next인식으로 사용하기 위해서 max_len 하나를 삭제
+                inputs, outputs = gen_batch_inputs(target_data, params, max_len - 1)
+                yield inputs, outputs
+
+    return data_generator, num_batches_per_epoch
