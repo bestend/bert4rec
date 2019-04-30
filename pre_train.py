@@ -14,6 +14,7 @@ def main():
     parser.add_argument('--train_dir', required=True)
 
     # learning option
+    parser.add_argument('--gpu_num', default=1, type=int)
     parser.add_argument('--batch_size', default=8, type=int)
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--epochs', default=100, type=int)
@@ -52,6 +53,7 @@ def main():
         seq_len=conf.max_len,
         pos_num=conf.pos_num,
         dropout_rate=conf.dropout_rate,
+        gpu_num=conf.gpu_num,
     )
     model.summary()
 
@@ -64,6 +66,8 @@ def main():
         epochs=conf.epochs,
         validation_data=valid_generator(),
         validation_steps=conf.validation_steps,
+        use_multiprocessing=True,
+        workers=6,
         callbacks=[
             keras.callbacks.EarlyStopping(monitor='val_loss', patience=conf.early_stop_patience)
         ],

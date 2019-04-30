@@ -23,7 +23,8 @@ def get_model(token_num,
               custom_layers=None,
               training=True,
               trainable=None,
-              lr=1e-4):
+              lr=1e-4,
+              gpu_num=1):
     """Get BERT model.
 
     See: https://arxiv.org/pdf/1810.04805.pdf
@@ -90,6 +91,10 @@ def get_model(token_num,
     mlm_pred_layer = EmbeddingSimilarity(name='MLM-Sim')([mlm_norm_layer, embed_weights])
     masked_layer = Masked(name='MLM')([mlm_pred_layer, inputs[-1]])
     model = keras.models.Model(inputs=inputs, outputs=masked_layer)
+    if gpu_num > 1:
+        from keras.utils.training_utils import multi_gpu_model
+        model = multi_gpu_model(model, gpus=gpu_num)
+
     model.compile(
         optimizer=keras.optimizers.Adam(lr=lr),
         loss=keras.losses.sparse_categorical_crossentropy,
