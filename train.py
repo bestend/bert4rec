@@ -19,7 +19,7 @@ def main():
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--epochs', default=100, type=int)
     parser.add_argument('--validation_steps', default=1000, type=int)
-    parser.add_argument('--early_stop_patience', default=5, type=int)
+    parser.add_argument('--early_stop_patience', default=2, type=int)
 
     # layer style
     parser.add_argument('--head_num', default=1, type=int)
@@ -66,20 +66,14 @@ def main():
         epochs=conf.epochs,
         validation_data=valid_generator(),
         validation_steps=conf.validation_steps,
-        use_multiprocessing=True,
-        workers=6,
+        # use_multiprocessing=True,
+        # workers=6,
         callbacks=[
-            keras.callbacks.EarlyStopping(monitor='val_loss', patience=conf.early_stop_patience)
+            keras.callbacks.EarlyStopping(monitor='val_loss', patience=conf.early_stop_patience),
+            keras.callbacks.ModelCheckpoint(os.path.join(conf.train_dir, 'weights{epoch:03d}.h5'),
+                                            save_weights_only=True)
         ],
     )
-
-    # model save
-    model_json = model.to_json()
-    with open("model.json", "w") as json_file:
-        json_file.write(model_json)
-    model.save_weights("model.h5")
-    print("Saved model to disk")
-
 
 if __name__ == '__main__':
     main()
