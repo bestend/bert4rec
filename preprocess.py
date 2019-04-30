@@ -34,7 +34,7 @@ def make_data(raw_data, dic_deal, dic_cat, dic_flag, dic_interval, max_len):
                 max(elem[CATEGORY]) > size_category or \
                 max(elem[FLAG]) > size_flag or \
                 max(elem[INTERVAL]) > size_interval:
-            #print("ID: ({}) data incorrect".format(idx))
+            # print("ID: ({}) data incorrect".format(idx))
             incorrect_count += 1
             continue
 
@@ -71,10 +71,12 @@ def convert(path):
     params['value_pad'] = dic_deal[TOKEN_PAD]
     params['value_unk'] = dic_deal[TOKEN_UNK]
     params['value_mask'] = dic_deal[TOKEN_MASK]
-    params['size_deal'] = len(dic_deal)
-    params['size_category'] = len(dic_cat)
-    params['size_flag'] = len(dic_flag)
-    params['size_interval'] = len(dic_interval)
+    params['input'] = [
+        {'name': 'deal', 'size': len(dic_deal)},
+        {'name': 'category', 'size': len(dic_cat)},
+        {'name': 'flag', 'size': len(dic_flag)},
+        {'name': 'interval', 'size': len(dic_interval)}
+    ]
     train_data = make_data(data_idx_list_train, dic_deal, dic_cat, dic_flag, dic_interval, max_len)
     dev_data = make_data(data_idx_list_dev, dic_deal, dic_cat, dic_flag, dic_interval, max_len)
 

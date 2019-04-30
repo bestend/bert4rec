@@ -17,21 +17,28 @@ class TokenEmbedding(keras.layers.Embedding):
         return [super(TokenEmbedding, self).call(inputs), self.embeddings]
 
 
-def get_inputs(seq_len):
+def get_inputs(input_params, seq_len):
     """Get input layers.
 
     See: https://arxiv.org/pdf/1810.04805.pdf
 
     :param seq_len: Length of the sequence or None.
     """
-    names = ['Token', 'Category', 'Flag', 'Interval', 'Masked']
-    return [keras.layers.Input(
+    inputs = []
+    for param in input_params:
+        inputs.append(keras.layers.Input(
+            shape=(seq_len,),
+            name='Input-%s' % param['name'],
+        ))
+
+    inputs.append(keras.layers.Input(
         shape=(seq_len,),
-        name='Input-%s' % name,
-    ) for name in names]
+        name='Input-%s' % 'Masked',
+    ))
+    return inputs
 
 
-def get_embedding(inputs, token_num, category_num, flag_num, interval_num, pos_num, embed_dim, dropout_rate=0.1,
+def get_embedding(inputs, input_params, pos_num, embed_dim, dropout_rate=0.1,
                   trainable=True):
     """Get embedding layer.
 
@@ -45,35 +52,27 @@ def get_embedding(inputs, token_num, category_num, flag_num, interval_num, pos_n
     :param trainable: Whether the layers are trainable.
     :return: The merged embedding layer and weights of token embedding.
     """
-    embeddings = [
-        TokenEmbedding(
-            input_dim=token_num,
-            output_dim=embed_dim,
-            mask_zero=True,
-            trainable=trainable,
-            name='Embedding-Token',
-        )(inputs[0]),
-        keras.layers.Embedding(
-            input_dim=category_num,
-            output_dim=embed_dim,
-            trainable=trainable,
-            name='Embedding-Category',
-        )(inputs[1]),
-        keras.layers.Embedding(
-            input_dim=flag_num,
-            output_dim=embed_dim,
-            trainable=trainable,
-            name='Embedding-Flag',
-        )(inputs[2]),
-        keras.layers.Embedding(
-            input_dim=interval_num,
-            output_dim=embed_dim,
-            trainable=trainable,
-            name='Embedding-Interval',
-        )(inputs[3]),
-    ]
+    embeddings = []
+    for idx, param in enumerate(input_params):
+        if idx is 0:
+            embedding = TokenEmbedding(
+                input_dim=param['size'],
+                output_dim=embed_dim,
+                mask_zero=True,
+                trainable=trainable,
+                name='Embedding-{}'.format(param['name']),
+            )(inputs[idx])
+        else:
+            embedding = keras.layers.Embedding(
+                input_dim=param['size'],
+                output_dim=embed_dim,
+                trainable=trainable,
+                name='Embedding-{}'.format(param['name']),
+            )(inputs[idx])
+        embeddings.append(embedding)
+
     embeddings[0], embed_weights = embeddings[0]
-    embed_layer = keras.layers.Add(name='Embedding-DCFI')(embeddings)
+    embed_layer = keras.layers.Add(name='Embedding-Total')(embeddings)
     embed_layer = PositionEmbedding(
         input_dim=pos_num,
         output_dim=embed_dim,

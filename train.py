@@ -42,10 +42,7 @@ def main():
     data, _, params = read_data(conf.input_dir)
 
     model = get_model(
-        token_num=params['size_deal'],
-        category_num=params['size_category'],
-        flag_num=params['size_flag'],
-        interval_num=params['size_interval'],
+        input_params=params['input'],
         head_num=conf.head_num,
         transformer_num=conf.transformer_num,
         embed_dim=conf.embed_dim,
@@ -74,6 +71,7 @@ def main():
                                             save_weights_only=True)
         ],
     )
+
 
 if __name__ == '__main__':
     main()

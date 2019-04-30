@@ -7,10 +7,7 @@ from keras_transformer import get_encoders
 from embedding import get_embedding, EmbeddingSimilarity, get_inputs
 
 
-def get_model(token_num,
-              category_num,
-              flag_num,
-              interval_num,
+def get_model(input_params,
               pos_num=512,
               seq_len=512,
               embed_dim=768,
@@ -29,7 +26,6 @@ def get_model(token_num,
 
     See: https://arxiv.org/pdf/1810.04805.pdf
 
-    :param token_num: Number of tokens.
     :param pos_num: Maximum position.
     :param seq_len: Maximum length of the input sequence or None.
     :param embed_dim: Dimensions of embeddings.
@@ -50,13 +46,13 @@ def get_model(token_num,
     """
     if trainable is None:
         trainable = training
-    inputs = get_inputs(seq_len=seq_len)
+    inputs = get_inputs(
+        input_params=input_params,
+        seq_len=seq_len
+    )
     embed_layer, embed_weights = get_embedding(
         inputs,
-        token_num=token_num,
-        category_num=category_num,
-        flag_num=flag_num,
-        interval_num=interval_num,
+        input_params=input_params,
         embed_dim=embed_dim,
         pos_num=pos_num,
         dropout_rate=dropout_rate,

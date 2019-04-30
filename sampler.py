@@ -27,12 +27,15 @@ def gen_batch_inputs(data,
     pad_value = params['value_pad']
     unk_value = params['value_unk']
     mask_value = params['value_mask']
-    size_deal = params['size_deal']
+    size_token = params['input'][0]['size']
+    token_name = params['input'][0]['name']
 
-    token_inputs, category_inputs, flag_inputs, interval_inputs, masked_inputs = [], [], [], [], []
+    # token_inputs, category_inputs, flag_inputs, interval_inputs, masked_inputs = [], [], [], [], []
+    inputs = [[] for _ in range(len(params['input']) + 1)]
+
     outputs = []
     for idx, elem in enumerate(data):
-        orig_len = len(elem['deal'])
+        orig_len = len(elem[token_name])
         cur_len = orig_len - 1
         if random_sample_length and cur_len > minimum_len:
             cur_len = random.randrange(random_sample_length, cur_len + 1)
@@ -41,14 +44,13 @@ def gen_batch_inputs(data,
         bidx = random.randrange(0, orig_len - (cur_len + 1) + 1)
         eidx = bidx + cur_len
 
-        category_inputs.append([pad_value] * rem_len + elem['category'][bidx:eidx] + [pad_value])
-        flag_inputs.append([pad_value] * rem_len + elem['flag'][bidx:eidx] + [pad_value])
-        interval_inputs.append([pad_value] * rem_len + elem['interval'][bidx:eidx] + [pad_value])
+        for pi, p in enumerate(params['input'][1:]):
+            inputs[pi + 1].append([pad_value] * rem_len + elem[p['name']][bidx:eidx] + [pad_value])
 
         token_input = []
         masked_input = []
         output = []
-        for token in elem['deal'][bidx:eidx]:
+        for token in elem[token_name][bidx:eidx]:
             output.append(token)
             if np.random.random() < mask_rate:
                 masked_input.append(1)
@@ -57,7 +59,7 @@ def gen_batch_inputs(data,
                     token_input.append(mask_value)
                 elif r < mask_mask_rate + mask_random_rate:
                     while True:
-                        random_token = random.randrange(0, size_deal)
+                        random_token = random.randrange(0, size_token)
                         if random_token is pad_value or random_token is unk_value or random_token is mask_value:
                             pass
                         else:
@@ -69,13 +71,13 @@ def gen_batch_inputs(data,
                 masked_input.append(0)
                 token_input.append(token)
 
-        token_inputs.append([pad_value] * rem_len + token_input + [mask_value])
+        inputs[0].append([pad_value] * rem_len + token_input + [mask_value])
         # masked_input에서 0은 non-mask 1은 mask
-        masked_inputs.append([0] * rem_len + masked_input + [1])
-        next_value = elem['deal'][eidx]
+        inputs[-1].append([0] * rem_len + masked_input + [1])
+        next_value = elem[token_name][eidx]
         outputs.append([pad_value] * rem_len + output + [next_value])
 
-    inputs = [np.asarray(x) for x in [token_inputs, category_inputs, flag_inputs, interval_inputs, masked_inputs]]
+    inputs = [np.asarray(x) for x in inputs]
     outputs = [np.asarray(np.expand_dims(x, axis=-1)) for x in [outputs]]
     return inputs, outputs
 
