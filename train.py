@@ -31,8 +31,7 @@ def main():
     parser.add_argument('--dropout_rate', default=0.05, type=float)
 
     # data noise level
-    parser.add_argument('--mask_rate', default=0.3, type=float)
-    parser.add_argument('--swap_sentence_rate', default=1.0, type=float)
+    parser.add_argument('--mask_rate', default=0.15, type=float)
 
     conf = parser.parse_args()
 
@@ -56,8 +55,8 @@ def main():
     with open(os.path.join(conf.train_dir, "model.json"), "w") as f:
         f.write(model.to_json(sort_keys=True, indent=4, separators=(',', ': ')))
 
-    train_generator, train_step = batch_iter(data, params, conf.batch_size, conf.max_len, data_type='train')
-    valid_generator, _ = batch_iter(data, params, conf.batch_size, conf.max_len, data_type='valid')
+    train_generator, train_step = batch_iter(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='train')
+    valid_generator, _ = batch_iter(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='valid')
 
     train_step = int(train_step / conf.gpu_num)
 

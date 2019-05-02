@@ -82,7 +82,7 @@ def gen_batch_inputs(data,
     return inputs, outputs
 
 
-def batch_iter(raw_data, params, batch_size, max_len, data_type='train', shuffle=True):
+def batch_iter(raw_data, params, batch_size, max_len, mask_rate, data_type='train', shuffle=True):
     num_batches_per_epoch = int((len(raw_data) - 1) / batch_size) + 1
 
     def data_generator():
@@ -101,19 +101,19 @@ def batch_iter(raw_data, params, batch_size, max_len, data_type='train', shuffle
                 if data_type == 'train':
                     target_data = shuffled_data[start_index: end_index][:-2]
                     random_sample_length = True
-                    mask_rate = 0.15
+                    mr = mask_rate
                 elif data_type == 'valid':
                     target_data = shuffled_data[start_index: end_index][:-1]
                     random_sample_length = True
-                    mask_rate = 0.15
+                    mr = mask_rate
                 else:
                     target_data = shuffled_data[start_index: end_index]
                     random_sample_length = False
-                    mask_rate = 0
+                    mr = mask_rate
 
                 # 마지막 index를 무조건 next인식으로 사용하기 위해서 max_len 하나를 삭제
                 inputs, outputs = gen_batch_inputs(target_data, params, max_len - 1,
-                                                   mask_rate=mask_rate,
+                                                   mask_rate=mr,
                                                    random_sample_length=random_sample_length)
                 yield inputs, outputs
 
