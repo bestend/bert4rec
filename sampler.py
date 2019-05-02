@@ -101,15 +101,19 @@ def batch_iter(raw_data, params, batch_size, max_len, data_type='train', shuffle
                 if data_type == 'train':
                     target_data = shuffled_data[start_index: end_index][:-2]
                     random_sample_length = True
+                    mask_rate = 0.15
                 elif data_type == 'valid':
                     target_data = shuffled_data[start_index: end_index][:-1]
                     random_sample_length = True
+                    mask_rate = 0.15
                 else:
                     target_data = shuffled_data[start_index: end_index]
                     random_sample_length = False
+                    mask_rate = 0
 
                 # 마지막 index를 무조건 next인식으로 사용하기 위해서 max_len 하나를 삭제
                 inputs, outputs = gen_batch_inputs(target_data, params, max_len - 1,
+                                                   mask_rate=mask_rate,
                                                    random_sample_length=random_sample_length)
                 yield inputs, outputs
 

@@ -1,10 +1,18 @@
+import glob
+import os
+
 import keras
+from keras.models import model_from_json
 from keras_bert import gelu
 from keras_bert.layers import Masked
 from keras_layer_normalization import LayerNormalization
+from keras_multi_head import MultiHeadAttention
+from keras_pos_embd import PositionEmbedding
+from keras_position_wise_feed_forward import FeedForward
 from keras_transformer import get_encoders
 
-from embedding import get_embedding, EmbeddingSimilarity, get_inputs
+from embedding import TokenEmbedding, EmbeddingSimilarity
+from embedding import get_embedding, get_inputs
 
 
 def get_model(input_params,
@@ -95,4 +103,31 @@ def get_model(input_params,
         optimizer=keras.optimizers.Adam(lr=lr),
         loss=keras.losses.sparse_categorical_crossentropy,
     )
+    return model
+
+
+def load_model(path, specific_weight):
+    with open(os.path.join(path, "model.json"), "r") as f:
+        custom_objects = {
+            "TokenEmbedding": TokenEmbedding,
+            "PositionEmbedding": PositionEmbedding,
+            "FeedForward": FeedForward,
+            "LayerNormalization": LayerNormalization,
+            "MultiHeadAttention": MultiHeadAttention,
+            "EmbeddingSimilarity": EmbeddingSimilarity,
+            "Masked": Masked,
+            "gelu": gelu,
+        }
+        model = model_from_json(f.read(), custom_objects=custom_objects)
+
+    try:
+        if specific_weight:
+            latest_weight = specific_weight
+        else:
+            latest_weight = sorted(glob.glob(os.path.join(path, 'weights' + '[0-9]' * 3 + '.h5')))[-1]
+
+        print("load from => {}".format(latest_weight))
+        model.load_weights(latest_weight)
+    except Exception as e:
+        print("weight file not found")
     return model

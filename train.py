@@ -53,6 +53,8 @@ def main():
         gpu_num=conf.gpu_num,
     )
     model.summary()
+    with open(os.path.join(conf.train_dir, "model.json"), "w") as f:
+        f.write(model.to_json(sort_keys=True, indent=4, separators=(',', ': ')))
 
     train_generator, train_step = batch_iter(data, params, conf.batch_size, conf.max_len, data_type='train')
     valid_generator, _ = batch_iter(data, params, conf.batch_size, conf.max_len, data_type='valid')
