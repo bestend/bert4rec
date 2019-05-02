@@ -59,6 +59,8 @@ def main():
     train_generator, train_step = batch_iter(data, params, conf.batch_size, conf.max_len, data_type='train')
     valid_generator, _ = batch_iter(data, params, conf.batch_size, conf.max_len, data_type='valid')
 
+    train_step = int(train_step / conf.gpu_num)
+
     model.fit_generator(
         generator=train_generator(),
         steps_per_epoch=train_step,
