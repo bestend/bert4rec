@@ -32,11 +32,11 @@ def main():
     for _ in tqdm(range(conf.test_steps)):
         inputs, outputs = next(g)
         predicts = model.predict(inputs)
-        outputs = list(map(lambda x: np.squeeze(x, axis=-1), outputs))
+        outputs = list(map(lambda x: np.squeeze(x, axis=-1), outputs[0]))
         predicts = list(map(lambda x: np.argsort(-x, axis=-1), predicts))
         batch_size, seq_len = inputs[-1].shape
         for i in range(batch_size):
-            rank = np.where(predicts[0][i] == outputs[0][i][-1])[0][0]
+            rank = np.where(predicts[i][-1] == outputs[i][-1])[0][0]
             if rank < 1:
                 HT1 += 1
             if rank < 5:

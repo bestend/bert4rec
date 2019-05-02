@@ -82,7 +82,7 @@ def gen_batch_inputs(data,
     return inputs, outputs
 
 
-def batch_iter(raw_data, params, batch_size, max_len, mask_rate, data_type='train', shuffle=True):
+def batch_iter(raw_data, params, batch_size, max_len, mask_rate=0.0, data_type='train', shuffle=True):
     num_batches_per_epoch = int((len(raw_data) - 1) / batch_size) + 1
 
     def data_generator():
