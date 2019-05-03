@@ -2,6 +2,7 @@ import argparse
 import os
 
 import keras
+from keras.callbacks import CSVLogger
 
 from model import get_model
 from sampler import read_data, batch_iter
@@ -55,7 +56,8 @@ def main():
     with open(os.path.join(conf.train_dir, "model.json"), "w") as f:
         f.write(model.to_json(sort_keys=True, indent=4, separators=(',', ': ')))
 
-    train_generator, train_step = batch_iter(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='train')
+    train_generator, train_step = batch_iter(data, params, conf.batch_size, conf.max_len, conf.mask_rate,
+                                             data_type='train')
     valid_generator, _ = batch_iter(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='valid')
 
     train_step = int(train_step / conf.gpu_num)
@@ -69,9 +71,13 @@ def main():
         # use_multiprocessing=True,
         # workers=6,
         callbacks=[
+            CSVLogger(os.path.join(conf.train_dir, "history.txt"), append=True),
             keras.callbacks.EarlyStopping(monitor='val_loss', patience=conf.early_stop_patience),
             keras.callbacks.ModelCheckpoint(os.path.join(conf.train_dir, 'weights{epoch:03d}.h5'),
+                                            monitor='val_loss',
+                                            save_best_only=True,
                                             save_weights_only=True)
+
         ],
     )
 
