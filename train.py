@@ -4,8 +4,9 @@ import os
 import keras
 from keras.callbacks import CSVLogger
 
-from model import get_model
+from model import get_model, load_model
 from sampler import read_data, batch_iter
+from variables import MODEL_FILE_FORMAT, LAST_MODEL_FILE_FORMAT
 
 
 def main():
@@ -13,6 +14,7 @@ def main():
     # path
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--train_dir', required=True)
+    parser.add_argument('--specific_weight', default=None)
 
     # learning option
     parser.add_argument('--gpu_num', default=1, type=int)
@@ -41,20 +43,23 @@ def main():
     # data 읽어서 처리하고
     data, _, params = read_data(conf.input_dir)
 
-    model = get_model(
-        input_params=params['input'],
-        head_num=conf.head_num,
-        transformer_num=conf.transformer_num,
-        embed_dim=conf.embed_dim,
-        feed_forward_dim=conf.feed_forward_dim,
-        seq_len=conf.max_len,
-        pos_num=conf.pos_num,
-        dropout_rate=conf.dropout_rate,
-        gpu_num=conf.gpu_num,
-    )
+    last_state_path = os.path.join(conf.train_dir, LAST_MODEL_FILE_FORMAT)
+    if os.path.exists(last_state_path):
+        model, initial_epoch = load_model(conf.train_dir)
+    else:
+        model = get_model(
+            input_params=params['input'],
+            head_num=conf.head_num,
+            transformer_num=conf.transformer_num,
+            embed_dim=conf.embed_dim,
+            feed_forward_dim=conf.feed_forward_dim,
+            seq_len=conf.max_len,
+            pos_num=conf.pos_num,
+            dropout_rate=conf.dropout_rate,
+            gpu_num=conf.gpu_num,
+        )
+        initial_epoch = 0
     model.summary()
-    with open(os.path.join(conf.train_dir, "model.json"), "w") as f:
-        f.write(model.to_json(sort_keys=True, indent=4, separators=(',', ': ')))
 
     train_generator, train_step = batch_iter(data, params, conf.batch_size, conf.max_len, conf.mask_rate,
                                              data_type='train')
@@ -70,14 +75,14 @@ def main():
         validation_steps=conf.validation_steps,
         # use_multiprocessing=True,
         # workers=6,
+        initial_epoch=initial_epoch,
         callbacks=[
             CSVLogger(os.path.join(conf.train_dir, "history.txt"), append=True),
             keras.callbacks.EarlyStopping(monitor='val_loss', patience=conf.early_stop_patience),
-            keras.callbacks.ModelCheckpoint(os.path.join(conf.train_dir, 'weights{epoch:03d}.h5'),
+            keras.callbacks.ModelCheckpoint(os.path.join(conf.train_dir, MODEL_FILE_FORMAT),
                                             monitor='val_loss',
-                                            save_best_only=True,
-                                            save_weights_only=True)
-
+                                            save_best_only=True),
+            keras.callbacks.ModelCheckpoint(os.path.join(conf.train_dir, 'last.h5'))
         ],
     )
 

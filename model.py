@@ -1,8 +1,8 @@
 import glob
 import os
+import re
 
 import keras
-from keras.models import model_from_json
 from keras_bert import gelu
 from keras_bert.layers import Masked
 from keras_layer_normalization import LayerNormalization
@@ -13,6 +13,7 @@ from keras_transformer import get_encoders
 
 from embedding import TokenEmbedding, EmbeddingSimilarity
 from embedding import get_embedding, get_inputs
+from variables import LAST_MODEL_FILE_FORMAT
 
 
 def get_model(input_params,
@@ -106,28 +107,54 @@ def get_model(input_params,
     return model
 
 
-def load_model(path, specific_weight):
-    with open(os.path.join(path, "model.json"), "r") as f:
-        custom_objects = {
-            "TokenEmbedding": TokenEmbedding,
-            "PositionEmbedding": PositionEmbedding,
-            "FeedForward": FeedForward,
-            "LayerNormalization": LayerNormalization,
-            "MultiHeadAttention": MultiHeadAttention,
-            "EmbeddingSimilarity": EmbeddingSimilarity,
-            "Masked": Masked,
-            "gelu": gelu,
-        }
-        model = model_from_json(f.read(), custom_objects=custom_objects)
+def get_custom_objects():
+    return {
+        "TokenEmbedding": TokenEmbedding,
+        "PositionEmbedding": PositionEmbedding,
+        "FeedForward": FeedForward,
+        "LayerNormalization": LayerNormalization,
+        "MultiHeadAttention": MultiHeadAttention,
+        "EmbeddingSimilarity": EmbeddingSimilarity,
+        "Masked": Masked,
+        "gelu": gelu,
+    }
+
+
+def get_last_epoch(model_path):
+    model_pattern = re.compile(r'^.*weights\.(\d+)\-\d+\.\d+\.h5$')
+    matched = model_pattern.match(model_path)
+    if not matched:
+        last_model = sorted(glob.glob(os.path.join(os.path.dirname(model_path), 'weights*.h5')))[-1]
+        matched = model_pattern.match(last_model)
+    if not matched:
+        print("warning: coudn`t extract last epoch num")
+        return 0
+    return int(matched.group(1))
+
+
+def load_model(train_dir, specific_weight=''):
+    custom_objects = {
+        "TokenEmbedding": TokenEmbedding,
+        "PositionEmbedding": PositionEmbedding,
+        "FeedForward": FeedForward,
+        "LayerNormalization": LayerNormalization,
+        "MultiHeadAttention": MultiHeadAttention,
+        "EmbeddingSimilarity": EmbeddingSimilarity,
+        "Masked": Masked,
+        "gelu": gelu,
+    }
 
     try:
         if specific_weight:
-            latest_weight = specific_weight
+            model_path = specific_weight
         else:
-            latest_weight = sorted(glob.glob(os.path.join(path, 'weights' + '[0-9]' * 3 + '.h5')))[-1]
+            model_path = os.path.join(train_dir, LAST_MODEL_FILE_FORMAT)
 
-        print("load from => {}".format(latest_weight))
-        model.load_weights(latest_weight)
+        last_epoch = get_last_epoch(model_path)
+        model = keras.models.load_model(model_path, custom_objects=custom_objects)
+        print("load from => {}".format(model_path))
     except Exception as e:
-        print("weight file not found")
-    return model
+        print(str(e))
+        print("model file not found")
+
+    return model, last_epoch

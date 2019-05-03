@@ -13,10 +13,10 @@ def main():
     parser.add_argument('--model_dir', required=True)
     parser.add_argument('--specific_weight', default=None)
     parser.add_argument('--batch_size', default=10, type=int)
-    parser.add_argument('--test_steps', default=1000, type=int)
+    parser.add_argument('--test_steps', default=10, type=int)
 
     conf = parser.parse_args()
-    model = load_model(conf.model_dir, conf.specific_weight)
+    model, _ = load_model(conf.model_dir, conf.specific_weight)
     model.summary(line_length=200)
 
     data, _, params = read_data(conf.input_dir)
