@@ -5,7 +5,7 @@ import random
 
 import numpy as np
 
-from variables import VALUE_PAD, VALUE_MASK, VALUE_UNK
+from variables import VALUE_PAD, VALUE_MASK, VALUE_UNK, DATA_SEQUENCE
 
 
 def read_data(data_path):
@@ -98,11 +98,13 @@ def batch_iter(raw_data, params, batch_size, max_len, mask_rate=0.0, data_type='
                 start_index = batch_num * batch_size
                 end_index = min((batch_num + 1) * batch_size, data_size)
                 if data_type == 'train':
-                    target_data = shuffled_data[start_index: end_index][:-2]
+                    target_data = [{k: data[k][:-2] for k in DATA_SEQUENCE} for idx, data in
+                                   enumerate(shuffled_data[start_index: end_index])]
                     random_sample_length = True
                     mr = mask_rate
                 elif data_type == 'valid':
-                    target_data = shuffled_data[start_index: end_index][:-1]
+                    target_data = [{k: data[k][:-1] for k in DATA_SEQUENCE} for idx, data in
+                                   enumerate(shuffled_data[start_index: end_index])]
                     random_sample_length = True
                     mr = mask_rate
                 else:
