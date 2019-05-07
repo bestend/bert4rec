@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 
 import keras
@@ -40,7 +41,9 @@ def main():
 
     os.makedirs(conf.train_dir, exist_ok=True)
 
-    # data 읽어서 처리하고
+    with open(os.path.join(conf.train_dir, 'config.json'), "w") as f:
+        json.dump(vars(conf), f, sort_keys=True, indent=4, separators=(',', ': '))
+
     data, _, params = read_data(conf.input_dir)
 
     last_state_path = os.path.join(conf.train_dir, LAST_MODEL_FILE_FORMAT)
