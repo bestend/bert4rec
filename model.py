@@ -97,7 +97,10 @@ def get_model(input_params,
     masked_layer = Masked(name='MLM')([mlm_pred_layer, inputs[-1]])
     model = keras.models.Model(inputs=inputs, outputs=masked_layer)
     if gpu_num > 1:
-        from keras.utils.training_utils import multi_gpu_model
+        # bug fix: keras multi gpu model save
+        # https://stackoverflow.com/questions/47210811/can-not-save-model-using-model-save-following-multi-gpu-model-in-keras
+        # from keras.utils.training_utils import multi_gpu_model
+        from utils import multi_gpu_model
         model = multi_gpu_model(model, gpus=gpu_num)
 
     model.compile(
@@ -108,6 +111,7 @@ def get_model(input_params,
 
 
 def get_custom_objects():
+    import tensorflow as tf
     return {
         "TokenEmbedding": TokenEmbedding,
         "PositionEmbedding": PositionEmbedding,
@@ -117,6 +121,7 @@ def get_custom_objects():
         "EmbeddingSimilarity": EmbeddingSimilarity,
         "Masked": Masked,
         "gelu": gelu,
+        "tf": tf  # keras multi gpu model bug fix
     }
 
 
@@ -133,17 +138,6 @@ def get_last_epoch(model_path):
 
 
 def load_model(train_dir, specific_weight=''):
-    custom_objects = {
-        "TokenEmbedding": TokenEmbedding,
-        "PositionEmbedding": PositionEmbedding,
-        "FeedForward": FeedForward,
-        "LayerNormalization": LayerNormalization,
-        "MultiHeadAttention": MultiHeadAttention,
-        "EmbeddingSimilarity": EmbeddingSimilarity,
-        "Masked": Masked,
-        "gelu": gelu,
-    }
-
     try:
         if specific_weight:
             model_path = specific_weight
@@ -151,7 +145,7 @@ def load_model(train_dir, specific_weight=''):
             model_path = os.path.join(train_dir, LAST_MODEL_FILE_FORMAT)
 
         last_epoch = get_last_epoch(model_path)
-        model = keras.models.load_model(model_path, custom_objects=custom_objects)
+        model = keras.models.load_model(model_path, custom_objects=get_custom_objects())
         print("load from => {}".format(model_path))
     except Exception as e:
         print(str(e))
