@@ -41,15 +41,21 @@ def main():
 
     os.makedirs(conf.train_dir, exist_ok=True)
 
-    with open(os.path.join(conf.train_dir, 'config.json'), "w") as f:
-        json.dump(vars(conf), f, sort_keys=True, indent=4, separators=(',', ': '))
-
     data, _, params = read_data(conf.input_dir)
 
-    last_state_path = os.path.join(conf.train_dir, LAST_MODEL_FILE_FORMAT)
+    if conf.specific_weight:
+        if os.path.exists(conf.specific_weight):
+            print("specific_weight: {}, file not found".format(conf.specific_weight))
+        last_state_path = conf.specific_weight
+    else:
+        last_state_path = os.path.join(conf.train_dir, LAST_MODEL_FILE_FORMAT)
+
     if os.path.exists(last_state_path):
         model, initial_epoch = load_model(conf.train_dir)
     else:
+        with open(os.path.join(conf.train_dir, 'config.json'), "w") as f:
+            json.dump(vars(conf), f, sort_keys=True, indent=4, separators=(',', ': '))
+
         model = get_model(
             input_params=params['input'],
             head_num=conf.head_num,
