@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 from model import load_model
 from sampler import read_data, batch_iter
+from variables import VALUE_UNK
 
 
 def main():
@@ -29,6 +30,7 @@ def main():
     HT10 = 0.0
     valid_user = 0
     g = generator()
+    unknown = 0.0
     for _ in tqdm(range(conf.test_steps)):
         inputs, outputs = next(g)
         predicts = model.predict(inputs)
@@ -36,6 +38,9 @@ def main():
         predicts = list(map(lambda x: np.argsort(-x, axis=-1), predicts))
         batch_size, seq_len = inputs[-1].shape
         for i in range(batch_size):
+            if predicts[i][-1] == VALUE_UNK:
+                unknown += 1
+                continue
             rank = np.where(predicts[i][-1] == outputs[i][-1])[0][0]
             if rank < 1:
                 HT1 += 1
@@ -51,7 +56,8 @@ def main():
     HT1 /= valid_user
     HT5 /= valid_user
     HT10 /= valid_user
-    print('NDCG = {}\nHT1 = {}\nHT5 = {}\nHT10 = {}\n'.format(NDCG, HT1, HT5, HT10))
+    unknown /= valid_user
+    print('NDCG = {}\nHT1 = {}\nHT5 = {}\nHT10 = {}\nUNK = {}'.format(NDCG, HT1, HT5, HT10, unknown))
 
 
 if __name__ == '__main__':
