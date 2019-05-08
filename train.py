@@ -5,6 +5,7 @@ import os
 import keras
 from keras.callbacks import CSVLogger
 
+from custom_model_checkpoint import CustomModelCheckpoint
 from model import get_model, load_model
 from sampler import read_data, batch_iter
 from variables import MODEL_FILE_FORMAT, LAST_MODEL_FILE_FORMAT
@@ -51,12 +52,12 @@ def main():
         last_state_path = os.path.join(conf.train_dir, LAST_MODEL_FILE_FORMAT)
 
     if os.path.exists(last_state_path):
-        model, initial_epoch = load_model(conf.train_dir)
+        model, core_model, initial_epoch = load_model(conf.train_dir, conf.gpu_num)
     else:
         with open(os.path.join(conf.train_dir, 'config.json'), "w") as f:
             json.dump(vars(conf), f, sort_keys=True, indent=4, separators=(',', ': '))
 
-        model = get_model(
+        model, core_model = get_model(
             input_params=params['input'],
             head_num=conf.head_num,
             transformer_num=conf.transformer_num,
@@ -88,10 +89,8 @@ def main():
         callbacks=[
             CSVLogger(os.path.join(conf.train_dir, "history.txt"), append=True),
             keras.callbacks.EarlyStopping(monitor='val_loss', patience=conf.early_stop_patience),
-            keras.callbacks.ModelCheckpoint(os.path.join(conf.train_dir, MODEL_FILE_FORMAT),
-                                            monitor='val_loss',
-                                            save_best_only=True),
-            keras.callbacks.ModelCheckpoint(os.path.join(conf.train_dir, 'last.h5'))
+            CustomModelCheckpoint(core_model, os.path.join(conf.train_dir, MODEL_FILE_FORMAT),
+                                  os.path.join(conf.train_dir, 'last.h5'))
         ],
     )
 

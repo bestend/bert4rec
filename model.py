@@ -3,6 +3,8 @@ import os
 import re
 
 import keras
+import tensorflow as tf
+from keras.utils import multi_gpu_model
 from keras_bert import gelu
 from keras_bert.layers import Masked
 from keras_layer_normalization import LayerNormalization
@@ -86,28 +88,36 @@ def get_model(input_params,
         )
     if not training:
         return inputs[:2], transformed
-    mlm_dense_layer = keras.layers.Dense(
-        units=embed_dim,
-        activation=feed_forward_activation,
-        trainable=trainable,
-        name='MLM-Dense',
-    )(transformed)
-    mlm_norm_layer = LayerNormalization(name='MLM-Norm')(mlm_dense_layer)
-    mlm_pred_layer = EmbeddingSimilarity(name='MLM-Sim')([mlm_norm_layer, embed_weights])
-    masked_layer = Masked(name='MLM')([mlm_pred_layer, inputs[-1]])
-    model = keras.models.Model(inputs=inputs, outputs=masked_layer)
-    if gpu_num > 1:
-        # bug fix: keras multi gpu model save
-        # https://stackoverflow.com/questions/47210811/can-not-save-model-using-model-save-following-multi-gpu-model-in-keras
-        # from keras.utils.training_utils import multi_gpu_model
-        from utils import multi_gpu_model
-        model = multi_gpu_model(model, gpus=gpu_num)
 
-    model.compile(
-        optimizer=keras.optimizers.Adam(lr=lr),
-        loss=keras.losses.sparse_categorical_crossentropy,
-    )
-    return model
+    def create_model():
+        mlm_dense_layer = keras.layers.Dense(
+            units=embed_dim,
+            activation=feed_forward_activation,
+            trainable=trainable,
+            name='MLM-Dense',
+        )(transformed)
+        mlm_norm_layer = LayerNormalization(name='MLM-Norm')(mlm_dense_layer)
+        mlm_pred_layer = EmbeddingSimilarity(name='MLM-Sim')([mlm_norm_layer, embed_weights])
+        masked_layer = Masked(name='MLM')([mlm_pred_layer, inputs[-1]])
+        model = keras.models.Model(inputs=inputs, outputs=masked_layer)
+        return model
+
+    if gpu_num > 1:
+        with tf.device('/cpu:0'):
+            model = create_model()
+        parallel_model = multi_gpu_model(model, gpus=gpu_num)
+        parallel_model.compile(
+            optimizer=keras.optimizers.Adam(lr=lr),
+            loss=keras.losses.sparse_categorical_crossentropy,
+        )
+        return parallel_model, model
+    else:
+        model = create_model()
+        model.compile(
+            optimizer=keras.optimizers.Adam(lr=lr),
+            loss=keras.losses.sparse_categorical_crossentropy,
+        )
+        return model, model
 
 
 def get_custom_objects():
@@ -137,7 +147,7 @@ def get_last_epoch(model_path):
     return int(matched.group(1))
 
 
-def load_model(train_dir, specific_weight=''):
+def load_model(train_dir, gpu_num, specific_weight=''):
     try:
         if specific_weight:
             model_path = specific_weight
@@ -145,10 +155,20 @@ def load_model(train_dir, specific_weight=''):
             model_path = os.path.join(train_dir, LAST_MODEL_FILE_FORMAT)
 
         last_epoch = get_last_epoch(model_path)
-        model = keras.models.load_model(model_path, custom_objects=get_custom_objects())
         print("load from => {}".format(model_path))
+        if gpu_num > 1:
+            with tf.device('/cpu:0'):
+                model = keras.models.load_model(model_path, custom_objects=get_custom_objects())
+            parallel_model = multi_gpu_model(model, gpus=gpu_num)
+            parallel_model.compile(
+                optimizer=model.optimizer,
+                loss=model.loss,
+            )
+            return parallel_model, model, last_epoch
+        else:
+            model = keras.models.load_model(model_path, custom_objects=get_custom_objects())
+        return model, model, last_epoch
+
     except Exception as e:
         print(str(e))
         print("model file not found")
-
-    return model, last_epoch
