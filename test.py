@@ -22,7 +22,7 @@ def main():
 
     data, _, params = read_data(conf.input_dir)
     # TODO johnkim max len을 model에서 불러오기
-    generator, _ = batch_iter(data, params, batch_size=8, max_len=30, data_type='test')
+    generator, _ = batch_iter(data, params, batch_size=conf.batch_size, max_len=30, data_type='test')
 
     NDCG = 0.0
     HT1 = 0.0
@@ -33,12 +33,12 @@ def main():
     unknown = 0.0
     for _ in tqdm(range(conf.test_steps)):
         inputs, outputs = next(g)
-        predicts = model.predict(inputs)
+        predicts = model.predict(inputs, batch_size=conf.batch_size)
         outputs = list(map(lambda x: np.squeeze(x, axis=-1), outputs[0]))
         predicts = list(map(lambda x: np.argsort(-x, axis=-1), predicts))
         batch_size, seq_len = inputs[-1].shape
         for i in range(batch_size):
-            if predicts[i][-1] == VALUE_UNK:
+            if outputs[i][-1] == VALUE_UNK:
                 unknown += 1
                 continue
             rank = np.where(predicts[i][-1] == outputs[i][-1])[0][0]

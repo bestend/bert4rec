@@ -35,10 +35,10 @@ def gen_batch_inputs(data,
     outputs = []
     for idx, elem in enumerate(data):
         orig_len = len(elem[token_name])
-        cur_len = orig_len - 1
+        cur_len = min(max_len, orig_len) - 1
         if random_sample_length and cur_len > minimum_len:
-            cur_len = random.randrange(random_sample_length, cur_len + 1)
-        rem_len = max_len - min(max_len, cur_len)
+            cur_len = random.randrange(minimum_len, cur_len + 1)
+        rem_len = max_len - cur_len
 
         bidx = random.randrange(0, orig_len - (cur_len + 1) + 1)
         eidx = bidx + cur_len
@@ -75,7 +75,6 @@ def gen_batch_inputs(data,
         inputs[-1].append([0] * rem_len + masked_input + [1])
         next_value = elem[token_name][eidx]
         outputs.append([VALUE_PAD] * rem_len + output + [next_value])
-
     inputs = [np.asarray(x) for x in inputs]
     outputs = [np.asarray(np.expand_dims(x, axis=-1)) for x in [outputs]]
     return inputs, outputs
