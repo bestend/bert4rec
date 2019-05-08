@@ -3,8 +3,9 @@ import argparse
 import numpy as np
 from tqdm import tqdm
 
+from data_generator import DataGenerator
 from model import load_model
-from sampler import read_data, batch_iter
+from utils import read_data
 from variables import VALUE_UNK
 
 
@@ -12,27 +13,27 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--model_dir', required=True)
-    parser.add_argument('--specific_weight', default=None)
+    parser.add_argument('--specific_weight', default='')
     parser.add_argument('--batch_size', default=10, type=int)
     parser.add_argument('--test_steps', default=10, type=int)
 
     conf = parser.parse_args()
-    model, _ = load_model(conf.model_dir, conf.specific_weight)
+    model, _, _ = load_model(conf.model_dir, conf.specific_weight)
     model.summary(line_length=200)
 
     data, _, params = read_data(conf.input_dir)
     # TODO johnkim max len을 model에서 불러오기
-    generator, _ = batch_iter(data, params, batch_size=conf.batch_size, max_len=30, data_type='test')
+    max_len = model.input_shape[0][1]
+    generator = DataGenerator(data, params, conf.batch_size, max_len, mask_rate=0.0, data_type='test')
 
     NDCG = 0.0
     HT1 = 0.0
     HT5 = 0.0
     HT10 = 0.0
     valid_user = 0
-    g = generator()
     unknown = 0.0
-    for _ in tqdm(range(conf.test_steps)):
-        inputs, outputs = next(g)
+    for idx in tqdm(range(conf.test_steps)):
+        inputs, outputs = generator[idx]
         predicts = model.predict(inputs, batch_size=conf.batch_size)
         outputs = list(map(lambda x: np.squeeze(x, axis=-1), outputs[0]))
         predicts = list(map(lambda x: np.argsort(-x, axis=-1), predicts))

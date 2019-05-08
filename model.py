@@ -147,7 +147,7 @@ def get_last_epoch(model_path):
     return int(matched.group(1))
 
 
-def load_model(train_dir, gpu_num, specific_weight=''):
+def load_model(train_dir, specific_weight='', gpu_num=1):
     try:
         if specific_weight:
             model_path = specific_weight

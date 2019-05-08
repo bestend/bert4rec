@@ -6,8 +6,9 @@ import keras
 from keras.callbacks import CSVLogger
 
 from custom_model_checkpoint import CustomModelCheckpoint
+from data_generator import DataGenerator
 from model import get_model, load_model
-from sampler import read_data, batch_iter
+from utils import read_data
 from variables import MODEL_FILE_FORMAT, LAST_MODEL_FILE_FORMAT
 
 
@@ -52,7 +53,7 @@ def main():
         last_state_path = os.path.join(conf.train_dir, LAST_MODEL_FILE_FORMAT)
 
     if os.path.exists(last_state_path):
-        model, core_model, initial_epoch = load_model(conf.train_dir, conf.gpu_num)
+        model, core_model, initial_epoch = load_model(conf.train_dir, gpu_num=conf.gpu_num)
     else:
         with open(os.path.join(conf.train_dir, 'config.json'), "w") as f:
             json.dump(vars(conf), f, sort_keys=True, indent=4, separators=(',', ': '))
@@ -71,17 +72,16 @@ def main():
         initial_epoch = 0
     model.summary()
 
-    train_generator, train_step = batch_iter(data, params, conf.batch_size, conf.max_len, conf.mask_rate,
-                                             data_type='train')
-    valid_generator, _ = batch_iter(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='valid')
+    train_generator = DataGenerator(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='train')
+    valid_generator = DataGenerator(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='valid')
 
-    train_step = int(train_step / conf.gpu_num)
+    keras.utils.Sequence()
 
     model.fit_generator(
-        generator=train_generator(),
-        steps_per_epoch=train_step,
+        generator=train_generator,
+        steps_per_epoch=len(train_generator),
         epochs=conf.epochs,
-        validation_data=valid_generator(),
+        validation_data=valid_generator,
         validation_steps=conf.validation_steps,
         # use_multiprocessing=True,
         # workers=6,
