@@ -147,7 +147,7 @@ def get_last_epoch(model_path):
     return int(matched.group(1))
 
 
-def load_model(train_dir, specific_weight='', gpu_num=1):
+def load_model(train_dir, specific_weight='', gpu_num=1, test_only=False):
     try:
         if specific_weight:
             model_path = specific_weight
@@ -160,10 +160,11 @@ def load_model(train_dir, specific_weight='', gpu_num=1):
             with tf.device('/cpu:0'):
                 model = keras.models.load_model(model_path, custom_objects=get_custom_objects())
             parallel_model = multi_gpu_model(model, gpus=gpu_num)
-            parallel_model.compile(
-                optimizer=model.optimizer,
-                loss=model.loss,
-            )
+            if not test_only:
+                parallel_model.compile(
+                    optimizer=model.optimizer,
+                    loss=model.loss,
+                )
             return parallel_model, model, last_epoch
         else:
             model = keras.models.load_model(model_path, custom_objects=get_custom_objects())
