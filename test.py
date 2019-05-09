@@ -44,11 +44,11 @@ def main():
                 unknown += 1
                 continue
             rank = ranks[i][outputs[i]]
-            if rank < 1:
+            if rank <= 1:
                 HT1 += 1
-            if rank < 5:
+            if rank <= 5:
                 HT5 += 1
-            if rank < 10:
+            if rank <= 10:
                 HT10 += 1
                 NDCG += 1 / np.log2(rank + 2)
 
