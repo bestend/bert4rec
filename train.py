@@ -70,7 +70,7 @@ def main():
             gpu_num=conf.gpu_num,
         )
         initial_epoch = 0
-    model.summary()
+    core_model.summary()
 
     train_generator = DataGenerator(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='train')
     valid_generator = DataGenerator(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='valid')
