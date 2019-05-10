@@ -39,25 +39,7 @@ class Worker(Process):
         predicts = model.predict(inputs, batch_size=inputs[-1].shape[0])
         outputs = outputs[0][:, -1, 0]
         ranks = scipy.stats.mstats.rankdata(predicts[:, -1, :] * -1, axis=1)
-        NDCG = 0.0
-        HT1 = 0.0
-        HT5 = 0.0
-        HT10 = 0.0
-        unknown = 0.0
-        for i in range(len(outputs)):
-            if outputs[i] == VALUE_UNK:
-                unknown += 1
-                continue
-            rank = ranks[i][outputs[i]]
-            if rank <= 1:
-                HT1 += 1
-            if rank <= 5:
-                HT5 += 1
-            if rank <= 10:
-                HT10 += 1
-                NDCG += 1 / np.log2(rank + 2)
-
-        return NDCG, HT1, HT5, HT10, unknown
+        return outputs, ranks
 
 
 class Collector(Process):
@@ -84,11 +66,19 @@ class Collector(Process):
                 if none_count == self._gpu_num:
                     break
             else:
-                NDCG += result[0]
-                HT1 += result[1]
-                HT5 += result[2]
-                HT10 += result[3]
-                unknown += result[4]
+                outputs, ranks = result
+                for i in range(len(outputs)):
+                    if outputs[i] == VALUE_UNK:
+                        unknown += 1
+                        continue
+                    rank = ranks[i][outputs[i]]
+                    if rank <= 1:
+                        HT1 += 1
+                    if rank <= 5:
+                        HT5 += 1
+                    if rank <= 10:
+                        HT10 += 1
+                        NDCG += 1 / np.log2(rank + 2)
                 pbar.update(1)
         pbar.close()
 
