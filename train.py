@@ -1,14 +1,17 @@
 import argparse
 import json
+import math
 import os
 
 import keras
+import tensorflow as tf
+from keras import backend as K
 from keras.callbacks import CSVLogger
 
 from custom_model_checkpoint import CustomModelCheckpoint
 from data_generator import DataGenerator
 from model import get_model, load_model
-from utils import read_data
+from utils import read_data, str2bool
 from variables import MODEL_FILE_FORMAT, LAST_MODEL_FILE_FORMAT
 
 
@@ -20,7 +23,8 @@ def main():
     parser.add_argument('--specific_weight', default=None)
 
     # learning option
-    parser.add_argument('--gpu_num', default=1, type=int)
+    parser.add_argument("--use_horovod", type=str2bool, nargs='?',
+                        const=True, help="Activate nice mode.")
     parser.add_argument('--batch_size', default=8, type=int)
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--epochs', default=100, type=int)
@@ -40,8 +44,19 @@ def main():
     parser.add_argument('--mask_rate', default=0.15, type=float)
 
     conf = parser.parse_args()
+    use_horovod = conf.use_horovod
+    if use_horovod:
+        import horovod.keras as hvd
 
-    os.makedirs(conf.train_dir, exist_ok=True)
+    if not use_horovod or hvd.rank() == 0:
+        os.makedirs(conf.train_dir, exist_ok=True)
+
+    if use_horovod:
+        hvd.init()
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
+        config.gpu_options.visible_device_list = str(hvd.local_rank())
+        K.set_session(tf.Session(config=config))
 
     data, _, params = read_data(conf.input_dir)
 
@@ -53,12 +68,12 @@ def main():
         last_state_path = os.path.join(conf.train_dir, LAST_MODEL_FILE_FORMAT)
 
     if os.path.exists(last_state_path):
-        model, core_model, initial_epoch = load_model(conf.train_dir, gpu_num=conf.gpu_num)
+        model, initial_epoch = load_model(conf.train_dir, conf.specific_weight)
     else:
         with open(os.path.join(conf.train_dir, 'config.json'), "w") as f:
             json.dump(vars(conf), f, sort_keys=True, indent=4, separators=(',', ': '))
 
-        model, core_model = get_model(
+        model = get_model(
             input_params=params['input'],
             head_num=conf.head_num,
             transformer_num=conf.transformer_num,
@@ -67,31 +82,41 @@ def main():
             seq_len=conf.max_len,
             pos_num=conf.pos_num,
             dropout_rate=conf.dropout_rate,
-            gpu_num=conf.gpu_num,
+            lr=conf.lr,
+            use_horovod=use_horovod
         )
         initial_epoch = 0
-    core_model.summary()
+
+    model.summary()
 
     train_generator = DataGenerator(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='train')
     valid_generator = DataGenerator(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='valid')
+    train_steps = len(train_generator)
 
-    keras.utils.Sequence()
+    callbacks = []
+    if use_horovod:
+        callbacks.append(hvd.callbacks.BroadcastGlobalVariablesCallback(0))
+        train_steps = int(math.ceil(train_steps / hvd.size()))
+
+    if not use_horovod or hvd.rank() == 0:
+        callbacks.extend([
+            CSVLogger(os.path.join(conf.train_dir, "history.txt"), append=True),
+            keras.callbacks.TensorBoard(log_dir=os.path.join(conf.train_dir, "graph"), histogram_freq=0,
+                                        write_graph=True, write_images=True),
+            CustomModelCheckpoint(os.path.join(conf.train_dir, MODEL_FILE_FORMAT),
+                                  os.path.join(conf.train_dir, 'last.h5'))
+        ])
 
     model.fit_generator(
         generator=train_generator,
-        steps_per_epoch=len(train_generator),
+        steps_per_epoch=train_steps,
         epochs=conf.epochs,
         validation_data=valid_generator,
         validation_steps=conf.validation_steps,
         # use_multiprocessing=True,
         # workers=6,
         initial_epoch=initial_epoch,
-        callbacks=[
-            CSVLogger(os.path.join(conf.train_dir, "history.txt"), append=True),
-            keras.callbacks.EarlyStopping(monitor='val_loss', patience=conf.early_stop_patience),
-            CustomModelCheckpoint(core_model, os.path.join(conf.train_dir, MODEL_FILE_FORMAT),
-                                  os.path.join(conf.train_dir, 'last.h5'))
-        ],
+        callbacks=callbacks,
     )
 
 
