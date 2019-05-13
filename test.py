@@ -19,7 +19,7 @@ def predict(data_list, model_dir, specific_weight, show_summary=True, gpuid=None
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
         os.environ["CUDA_VISIBLE_DEVICES"] = str(gpuid)
 
-    model, _, _ = load_model(model_dir, specific_weight, test_only=True)
+    model, _ = load_model(model_dir, specific_weight)
     if show_summary:
         model.summary(line_length=200)
 

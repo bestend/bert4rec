@@ -24,7 +24,7 @@ def main():
 
     # learning option
     parser.add_argument("--use_horovod", type=str2bool, nargs='?',
-                        const=True, help="Activate nice mode.")
+                        const=False, help="Activate nice mode.")
     parser.add_argument('--batch_size', default=8, type=int)
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--epochs', default=100, type=int)

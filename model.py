@@ -85,7 +85,7 @@ def get_model(input_params,
             trainable=trainable,
         )
     if not training:
-        return inputs[:2], transformed
+        return inputs[:-1], transformed
 
     mlm_dense_layer = keras.layers.Dense(
         units=embed_dim,
