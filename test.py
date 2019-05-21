@@ -9,17 +9,17 @@ import scipy.stats
 from tqdm import tqdm
 
 from data_generator import DataGenerator
-from model import load_model
+from model import load_model, get_best_model_path
 from utils import read_data
 from variables import VALUE_UNK
 
 
-def predict(data_list, model_dir, specific_weight, show_summary=True, gpuid=None):
+def predict(data_list, model_dir, show_summary=True, gpuid=None):
     if gpuid is not None:
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
         os.environ["CUDA_VISIBLE_DEVICES"] = str(gpuid)
 
-    model, _ = load_model(model_dir, specific_weight)
+    model, _ = load_model(model_dir)
     if show_summary:
         model.summary(line_length=200)
 
@@ -64,22 +64,24 @@ def main():
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--model_dir', required=True)
     parser.add_argument('--gpu_num', default=1, type=int)
-    parser.add_argument('--specific_weight', default='')
     parser.add_argument('--batch_size', default=10, type=int)
     parser.add_argument('--test_steps', default=10, type=int)
 
     conf = parser.parse_args()
 
     data, _, params = read_data(conf.input_dir)
-    with open(os.path.join(conf.model_dir, "config.json"), "r") as f:
+    if os.path.isfile(conf.model_dir):
+        model_path = conf.model_dir
+    else:
+        model_path = get_best_model_path(conf.model_dir)
+    with open(os.path.join(os.path.dirname(conf.model_dir), "config.json"), "r") as f:
         old_conf = json.load(f)
         max_len = old_conf['max_len']
     generator = DataGenerator(data, params, int(conf.batch_size / conf.gpu_num), max_len, mask_rate=0.0,
                               data_type='test')
     data_list = [generator[idx] for idx in range(conf.test_steps * conf.gpu_num)]
     if conf.gpu_num == 1:
-        NDCG, HT1, HT5, HT10, unknown = predict(data_list, conf.model_dir, conf.specific_weight, show_summary=True,
-                                                gpuid=None)
+        NDCG, HT1, HT5, HT10, unknown = predict(data_list, model_path, show_summary=True, gpuid=None)
     else:
         with concurrent.futures.ProcessPoolExecutor(max_workers=conf.gpu_num) as executor:
             data_size = len(data_list)
@@ -87,8 +89,7 @@ def main():
             futures = []
             for idx in range(conf.gpu_num):
                 sub_data_list = data_list[per_data * idx: min(per_data * (idx + 1), data_size)]
-                future = executor.submit(predict, sub_data_list, conf.model_dir, conf.specific_weight,
-                                         show_summary=idx == 0, gpuid=idx)
+                future = executor.submit(predict, sub_data_list, model_path, show_summary=idx == 0, gpuid=idx)
                 futures.append(future)
 
             result = np.array([future.result() for future in futures]).sum(axis=0) / conf.gpu_num

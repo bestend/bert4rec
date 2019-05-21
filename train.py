@@ -20,7 +20,6 @@ def main():
     # path
     parser.add_argument('--input_dir', required=True)
     parser.add_argument('--train_dir', required=True)
-    parser.add_argument('--specific_weight', default=None)
 
     # learning option
     parser.add_argument("--use_horovod", type=str2bool, nargs='?',
@@ -60,15 +59,10 @@ def main():
 
     data, _, params = read_data(conf.input_dir)
 
-    if conf.specific_weight:
-        if os.path.exists(conf.specific_weight):
-            print("specific_weight: {}, file not found".format(conf.specific_weight))
-        last_state_path = conf.specific_weight
-    else:
-        last_state_path = os.path.join(conf.train_dir, LAST_MODEL_FILE_FORMAT)
+    last_state_path = os.path.join(conf.train_dir, LAST_MODEL_FILE_FORMAT)
 
     if os.path.exists(last_state_path):
-        model, initial_epoch = load_model(conf.train_dir, conf.specific_weight)
+        model, initial_epoch = load_model(conf.train_dir)
     else:
         with open(os.path.join(conf.train_dir, 'config.json'), "w") as f:
             json.dump(vars(conf), f, sort_keys=True, indent=4, separators=(',', ': '))
@@ -93,7 +87,7 @@ def main():
     valid_generator = DataGenerator(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='valid')
     train_steps = len(train_generator)
 
-    callbacks = []
+    callbacks = [keras.callbacks.EarlyStopping(monitor='val_loss', patience=conf.early_stop_patience)]
     if use_horovod:
         callbacks.append(hvd.callbacks.BroadcastGlobalVariablesCallback(0))
         train_steps = int(math.ceil(train_steps / hvd.size()))

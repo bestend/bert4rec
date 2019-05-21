@@ -1,6 +1,5 @@
 import glob
 import os
-import re
 
 import keras
 from keras_bert import gelu
@@ -13,7 +12,7 @@ from keras_transformer import get_encoders
 
 from embedding import TokenEmbedding, EmbeddingSimilarity
 from embedding import get_embedding, get_inputs
-from variables import LAST_MODEL_FILE_FORMAT
+from variables import LAST_MODEL_FILE_FORMAT, MODEL_REGEX_PATTERN
 
 
 def get_model(input_params,
@@ -128,23 +127,35 @@ def get_custom_objects():
 
 
 def get_last_epoch(model_path):
-    model_pattern = re.compile(r'^.*weights\.(\d+)\-\d+\.\d+\.h5$')
-    matched = model_pattern.match(model_path)
-    if not matched:
-        last_model = sorted(glob.glob(os.path.join(os.path.dirname(model_path), 'weights*.h5')))[-1]
-        matched = model_pattern.match(last_model)
-    if not matched:
+    matched = MODEL_REGEX_PATTERN.match(model_path)
+    if matched:
+        return int(matched.group(1))
+    try:
+        with open(os.path.join(os.path.dirname(model_path), 'history.txt'), 'r') as f:
+            lines = f.readlines()
+            return int(lines[-1].split(',')[0])
+    except:
         print("warning: coudn`t extract last epoch num")
         return 0
-    return int(matched.group(1))
 
 
-def load_model(train_dir, specific_weight=''):
+def get_best_model_path(model_path):
+    last_model = sorted(glob.glob(os.path.join(os.path.dirname(model_path), 'weights*.h5')))[-1]
+    if MODEL_REGEX_PATTERN.match(last_model):
+        return last_model
+    else:
+        print("warning: coudn`t find best model path")
+        return model_path
+
+
+def load_model(train_dir):
     try:
-        if specific_weight:
-            model_path = specific_weight
-        else:
+        if os.path.isfile(train_dir):
+            model_path = train_dir
+        elif os.path.isdir(train_dir):
             model_path = os.path.join(train_dir, LAST_MODEL_FILE_FORMAT)
+        else:
+            raise Exception('path not exist')
 
         last_epoch = get_last_epoch(model_path)
         print("load from => {}".format(model_path))
