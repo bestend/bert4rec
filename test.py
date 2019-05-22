@@ -5,7 +5,8 @@ import os
 from math import ceil
 
 import numpy as np
-import scipy.stats
+from keras import Model
+from keras.layers import Lambda
 from tqdm import tqdm
 
 from data_generator import DataGenerator
@@ -14,14 +15,30 @@ from utils import read_data
 from variables import VALUE_UNK
 
 
+def add_rank_layer_to_model(model, batch_size, k):
+    import tensorflow as tf
+
+    def top_k(input, k):
+        return tf.nn.top_k(input, k=k).indices
+
+    output = model.outputs[0]
+    output = Lambda(lambda x: x[:, -1, :])(output)
+    output = Lambda(top_k, arguments={'k': k})(output)
+    model = Model(inputs=model.inputs, outputs=output)
+    return model
+
+
 def predict(data_list, model_dir, show_summary=True, gpuid=None):
     if gpuid is not None:
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
         os.environ["CUDA_VISIBLE_DEVICES"] = str(gpuid)
+    batch_size, seq_len = data_list[0][0][-1].shape
 
     model, _ = load_model(model_dir)
     if show_summary:
         model.summary(line_length=200)
+
+    model = add_rank_layer_to_model(model, batch_size, 10)
 
     NDCG = 0.0
     HT1 = 0.0
@@ -33,20 +50,22 @@ def predict(data_list, model_dir, show_summary=True, gpuid=None):
         data_list = tqdm(data_list)
     for data in data_list:
         inputs, outputs = data
-        batch_size, seq_len = inputs[-1].shape
-        predicts = model.predict(inputs, batch_size=batch_size)
         outputs = outputs[0][:, -1, 0]
-        ranks = scipy.stats.mstats.rankdata(predicts[:, -1, :] * -1, axis=1)
+        predicts = model.predict(inputs, batch_size=batch_size)
+
         for i in range(batch_size):
+            find_result = np.where(predicts[i] == outputs[i])
             if outputs[i] == VALUE_UNK:
                 unknown += 1
+            #    continue
+            if find_result[0].size == 0:
                 continue
-            rank = ranks[i][outputs[i]]
-            if rank <= 1:
+            rank = find_result[0][0]
+            if rank < 1:
                 HT1 += 1
-            if rank <= 5:
+            if rank < 5:
                 HT5 += 1
-            if rank <= 10:
+            if rank < 10:
                 HT10 += 1
                 NDCG += 1 / np.log2(rank + 2)
 
