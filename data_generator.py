@@ -1,4 +1,5 @@
 import random
+from math import ceil
 
 import keras
 import numpy as np
@@ -28,7 +29,7 @@ class DataGenerator(keras.utils.Sequence):
         self.on_epoch_end()
 
     def __len__(self):
-        return int(np.floor(self.data_size / self.batch_size))
+        return int(ceil(self.data_size / self.batch_size))
 
     def __getitem__(self, index):
         start_index = index * self.batch_size

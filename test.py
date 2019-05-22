@@ -28,7 +28,7 @@ def add_rank_layer_to_model(model, k):
     return model
 
 
-def predict(data_list, model_dir, show_summary=True, gpuid=None):
+def predict(data_list, model_dir, total_size, show_summary=True, gpuid=None):
     if gpuid is not None:
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
         os.environ["CUDA_VISIBLE_DEVICES"] = str(gpuid)
@@ -45,6 +45,8 @@ def predict(data_list, model_dir, show_summary=True, gpuid=None):
     HT10 = 0.0
     valid_user = 0
     unknown = 0.0
+
+    data_size = len(data_list)
     if show_summary:
         data_list = tqdm(data_list)
     for data in data_list:
@@ -70,11 +72,12 @@ def predict(data_list, model_dir, show_summary=True, gpuid=None):
                 NDCG += 1 / np.log2(rank + 2)
 
         valid_user += batch_size
-    NDCG /= valid_user
-    HT1 /= valid_user
-    HT5 /= valid_user
-    HT10 /= valid_user
-    unknown /= valid_user
+    NDCG /= valid_user * data_size / total_size
+    HT1 /= valid_user * data_size / total_size
+    HT5 /= valid_user * data_size / total_size
+    HT10 /= valid_user * data_size / total_size
+    unknown /= valid_user * data_size / total_size
+
     return NDCG, HT1, HT5, HT10, unknown
 
 
@@ -84,7 +87,7 @@ def main():
     parser.add_argument('--model_dir', required=True)
     parser.add_argument('--gpu_num', default=1, type=int)
     parser.add_argument('--batch_size', default=10, type=int)
-    parser.add_argument('--test_steps', default=10, type=int)
+    parser.add_argument('--test_steps', default=0, type=int)
 
     conf = parser.parse_args()
 
@@ -98,20 +101,25 @@ def main():
         max_len = old_conf['max_len']
     generator = DataGenerator(data, params, int(conf.batch_size / conf.gpu_num), max_len, mask_rate=0.0,
                               data_type='test')
-    data_list = [generator[idx] for idx in range(conf.test_steps * conf.gpu_num)]
+    test_steps = len(generator) if conf.test_steps == 0 else conf.test_steps
+    test_steps = min(test_steps, len(generator))
+
+    data_list = [generator[idx] for idx in range(test_steps)]
+    data_size = len(data_list)
     if conf.gpu_num == 1:
-        NDCG, HT1, HT5, HT10, unknown = predict(data_list, model_path, show_summary=True, gpuid=None)
+        NDCG, HT1, HT5, HT10, unknown = predict(data_list, model_path, total_size=data_size, show_summary=True,
+                                                gpuid=None)
     else:
         with concurrent.futures.ProcessPoolExecutor(max_workers=conf.gpu_num) as executor:
-            data_size = len(data_list)
             per_data = int(ceil(data_size / conf.gpu_num))
             futures = []
             for idx in range(conf.gpu_num):
                 sub_data_list = data_list[per_data * idx: min(per_data * (idx + 1), data_size)]
-                future = executor.submit(predict, sub_data_list, model_path, show_summary=idx == 0, gpuid=idx)
+                future = executor.submit(predict, sub_data_list, model_path, total_size=data_size,
+                                         show_summary=idx == 0, gpuid=idx)
                 futures.append(future)
 
-            result = np.array([future.result() for future in futures]).sum(axis=0) / conf.gpu_num
+            result = np.array([future.result() for future in futures]).sum(axis=0)
             NDCG, HT1, HT5, HT10, unknown = result
 
     print('NDCG = {}\nHT1 = {}\nHT5 = {}\nHT10 = {}\nUNK = {}'.format(NDCG, HT1, HT5, HT10, unknown))
