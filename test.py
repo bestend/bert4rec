@@ -33,10 +33,10 @@ def predict(data_list, model_dir, show_summary=True, gpuid=None):
         data_list = tqdm(data_list)
     for data in data_list:
         inputs, outputs = data
-        predicts = model.predict(inputs)
+        batch_size, seq_len = inputs[-1].shape
+        predicts = model.predict(inputs, batch_size=batch_size)
         outputs = outputs[0][:, -1, 0]
         ranks = scipy.stats.mstats.rankdata(predicts[:, -1, :] * -1, axis=1)
-        batch_size, seq_len = inputs[-1].shape
         for i in range(batch_size):
             if outputs[i] == VALUE_UNK:
                 unknown += 1
@@ -74,7 +74,7 @@ def main():
         model_path = conf.model_dir
     else:
         model_path = get_best_model_path(conf.model_dir)
-    with open(os.path.join(os.path.dirname(conf.model_dir), "config.json"), "r") as f:
+    with open(os.path.join(os.path.dirname(model_path), "config.json"), "r") as f:
         old_conf = json.load(f)
         max_len = old_conf['max_len']
     generator = DataGenerator(data, params, int(conf.batch_size / conf.gpu_num), max_len, mask_rate=0.0,

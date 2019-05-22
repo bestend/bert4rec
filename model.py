@@ -139,13 +139,13 @@ def get_last_epoch(model_path):
         return 0
 
 
-def get_best_model_path(model_path):
-    last_model = sorted(glob.glob(os.path.join(os.path.dirname(model_path), 'weights*.h5')))[-1]
+def get_best_model_path(model_dir):
+    last_model = sorted(glob.glob(os.path.join(model_dir, 'weights*.h5')))[-1]
     if MODEL_REGEX_PATTERN.match(last_model):
         return last_model
     else:
         print("warning: coudn`t find best model path")
-        return model_path
+        return model_dir
 
 
 def load_model(train_dir):
