@@ -15,7 +15,7 @@ from utils import read_data
 from variables import VALUE_UNK
 
 
-def add_rank_layer_to_model(model, batch_size, k):
+def add_rank_layer_to_model(model, k):
     import tensorflow as tf
 
     def top_k(input, k):
@@ -32,13 +32,12 @@ def predict(data_list, model_dir, show_summary=True, gpuid=None):
     if gpuid is not None:
         os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
         os.environ["CUDA_VISIBLE_DEVICES"] = str(gpuid)
-    batch_size, seq_len = data_list[0][0][-1].shape
 
     model, _ = load_model(model_dir)
     if show_summary:
         model.summary(line_length=200)
 
-    model = add_rank_layer_to_model(model, batch_size, 10)
+    model = add_rank_layer_to_model(model, 10)
 
     NDCG = 0.0
     HT1 = 0.0
@@ -50,6 +49,7 @@ def predict(data_list, model_dir, show_summary=True, gpuid=None):
         data_list = tqdm(data_list)
     for data in data_list:
         inputs, outputs = data
+        batch_size, seq_len = inputs[-1].shape
         outputs = outputs[0][:, -1, 0]
         predicts = model.predict(inputs, batch_size=batch_size)
 
