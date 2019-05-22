@@ -44,18 +44,17 @@ def main():
 
     conf = parser.parse_args()
     use_horovod = conf.use_horovod
+
     if use_horovod:
         import horovod.keras as hvd
-
-    if not use_horovod or hvd.rank() == 0:
-        os.makedirs(conf.train_dir, exist_ok=True)
-
-    if use_horovod:
         hvd.init()
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
         config.gpu_options.visible_device_list = str(hvd.local_rank())
         K.set_session(tf.Session(config=config))
+
+    if not use_horovod or hvd.rank() == 0:
+        os.makedirs(conf.train_dir, exist_ok=True)
 
     data, _, params = read_data(conf.input_dir)
 
@@ -101,6 +100,11 @@ def main():
                                   os.path.join(conf.train_dir, 'last.h5'))
         ])
 
+    if not use_horovod or hvd.rank() == 0:
+        verbose = 1
+    else:
+        verbose = 0
+
     model.fit_generator(
         generator=train_generator,
         steps_per_epoch=train_steps,
@@ -111,6 +115,7 @@ def main():
         # workers=6,
         initial_epoch=initial_epoch,
         callbacks=callbacks,
+        verbose=verbose
     )
 
 
