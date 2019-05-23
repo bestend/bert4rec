@@ -54,6 +54,8 @@ def main():
 
     if not use_horovod or hvd.rank() == 0:
         os.makedirs(conf.train_dir, exist_ok=True)
+    else:
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
     data, _, params = read_data(conf.input_dir)
 
@@ -79,11 +81,15 @@ def main():
         )
         initial_epoch = 0
 
-    model.summary()
+    if not use_horovod or hvd.rank() == 0:
+        model.summary()
 
     train_generator = DataGenerator(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='train')
     valid_generator = DataGenerator(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='valid')
     train_steps = len(train_generator)
+    validation_steps = conf.validation_steps
+    if use_horovod:
+        validation_steps /= hvd.size()
 
     callbacks = [
         keras.callbacks.EarlyStopping(monitor='val_loss', patience=conf.early_stop_patience),
