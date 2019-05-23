@@ -72,10 +72,14 @@ def predict(data_list, model_dir, total_size, show_summary=True, gpuid=None):
                 NDCG += 1 / np.log2(rank + 2)
 
         valid_user += batch_size
-    NDCG /= valid_user * data_size / total_size
-    HT1 /= valid_user * data_size / total_size
-    HT5 /= valid_user * data_size / total_size
-    HT10 /= valid_user * data_size / total_size
+    NDCG /= valid_user
+    HT1 /= valid_user
+    HT5 /= valid_user
+    HT10 /= valid_user
+    NDCG *= data_size / total_size
+    HT1 *= data_size / total_size
+    HT5 *= data_size / total_size
+    HT10 *= data_size / total_size
     unknown /= valid_user * data_size / total_size
 
     return NDCG, HT1, HT5, HT10, unknown
