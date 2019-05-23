@@ -85,9 +85,17 @@ def main():
     valid_generator = DataGenerator(data, params, conf.batch_size, conf.max_len, conf.mask_rate, data_type='valid')
     train_steps = len(train_generator)
 
-    callbacks = [keras.callbacks.EarlyStopping(monitor='val_loss', patience=conf.early_stop_patience)]
+    callbacks = [
+        keras.callbacks.EarlyStopping(monitor='val_loss', patience=conf.early_stop_patience),
+    ]
     if use_horovod:
-        callbacks.append(hvd.callbacks.BroadcastGlobalVariablesCallback(0))
+        callbacks.extend(
+            [
+                hvd.callbacks.BroadcastGlobalVariablesCallback(0),
+                hvd.callbacks.MetricAverageCallback(),
+                hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1)
+            ]
+        )
         train_steps = int(math.ceil(train_steps / hvd.size()))
 
     if not use_horovod or hvd.rank() == 0:
@@ -98,6 +106,8 @@ def main():
             CustomModelCheckpoint(os.path.join(conf.train_dir, MODEL_FILE_FORMAT),
                                   os.path.join(conf.train_dir, 'last.h5'))
         ])
+
+    callbacks.append(keras.callbacks.ReduceLROnPlateau(patience=10, verbose=1))
 
     if not use_horovod or hvd.rank() == 0:
         verbose = 1
