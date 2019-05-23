@@ -133,7 +133,7 @@ def get_last_epoch(model_path):
     try:
         with open(os.path.join(os.path.dirname(model_path), 'history.txt'), 'r') as f:
             lines = f.readlines()
-            return int(lines[-1].split(',')[0])
+            return int(lines[-1].split(',')[0]) + 1
     except:
         print("warning: coudn`t extract last epoch num")
         return 0

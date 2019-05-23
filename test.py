@@ -99,8 +99,7 @@ def main():
     with open(os.path.join(os.path.dirname(model_path), "config.json"), "r") as f:
         old_conf = json.load(f)
         max_len = old_conf['max_len']
-    generator = DataGenerator(data, params, int(conf.batch_size / conf.gpu_num), max_len, mask_rate=0.0,
-                              data_type='test')
+    generator = DataGenerator(data, params, conf.batch_size, max_len, mask_rate=0.0, data_type='test')
     test_steps = len(generator) if conf.test_steps == 0 else conf.test_steps
     test_steps = min(test_steps, len(generator))
 
