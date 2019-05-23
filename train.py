@@ -98,8 +98,8 @@ def main():
         callbacks.extend(
             [
                 hvd.callbacks.BroadcastGlobalVariablesCallback(0),
-                hvd.callbacks.MetricAverageCallback(),
-                hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1)
+                #hvd.callbacks.MetricAverageCallback(),
+                #hvd.callbacks.LearningRateWarmupCallback(warmup_epochs=5, verbose=1)
             ]
         )
         train_steps = int(math.ceil(train_steps / hvd.size()))
